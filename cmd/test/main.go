@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"math"
 
@@ -15,29 +16,50 @@ const (
 	MaxDownloads   = 16
 )
 
+const (
+	Z          = 11
+	Lat0, Lng0 = 35.2, -114.2
+	Lat1, Lng1 = 37.0, -111.4
+)
+
 func main() {
-	// z := 0
-	// n := 1 << uint(z)
-	// fmt.Println(z, n)
+	p0 := terrarium.TileXY(Z, terrarium.LatLng(Lat0, Lng0))
+	p1 := terrarium.TileXY(Z, terrarium.LatLng(Lat1, Lng1))
+	x0 := p0.X
+	y0 := p0.Y
+	x1 := p1.X
+	y1 := p1.Y
+	if x1 < x0 {
+		x0, x1 = x1, x0
+	}
+	if y1 < y0 {
+		y0, y1 = y1, y0
+	}
+	x1++
+	y1++
+	fmt.Println(x0, x1)
+	fmt.Println(y0, y1)
 
 	cache := terrarium.NewCache(URLTemplate, CacheDirectory, MaxDownloads)
-	// for y := 0; y < n; y++ {
-	// 	for x := 0; x < n; x++ {
-	// 		cache.EnsureTile(z, x, y)
-	// 	}
-	// }
-	cache.EnsureTile(14, 3087, 6422)
+	for y := y0; y < y1; y++ {
+		for x := x0; x < x1; x++ {
+			cache.EnsureTile(Z, x, y)
+		}
+	}
 	cache.Wait()
 
-	tile, err := cache.GetTile(14, 3087, 6422)
-	if err != nil {
-		panic(err)
-	}
-
 	var paths []terrarium.Path
-	for z := 0; z < 5000; z += 25 {
-		p := tile.ContourLines(float64(z))
-		paths = append(paths, p...)
+	for y := y0; y < y1; y++ {
+		for x := x0; x < x1; x++ {
+			tile, err := cache.GetTile(Z, x, y)
+			if err != nil {
+				panic(err)
+			}
+			for z := 0; z < 5000; z += 100 {
+				p := tile.ContourLines(float64(z))
+				paths = append(paths, p...)
+			}
+		}
 	}
 
 	proj := maps.NewMercatorProjection()
@@ -49,7 +71,7 @@ func main() {
 		}
 	}
 
-	im := renderPaths(paths, 1024, 0, 1)
+	im := renderPaths(paths, 4096, 0, 1.5)
 	gg.SavePNG("out.png", im)
 }
 
@@ -80,6 +102,7 @@ func renderPaths(paths []terrarium.Path, size, pad int, lw float64) image.Image 
 	sy := float64(size-pad*2) / ph
 	scale := math.Min(sx, sy)
 	dc := gg.NewContext(int(pw*scale)+pad*2, int(ph*scale)+pad*2)
+	dc.InvertY()
 	dc.SetRGB(1, 1, 1)
 	dc.Clear()
 	dc.Translate(float64(pad), float64(pad))
