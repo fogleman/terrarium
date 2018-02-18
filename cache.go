@@ -13,8 +13,6 @@ import (
 	"sync"
 )
 
-const TileSize = 256
-
 type Cache struct {
 	URLTemplate  string
 	Directory    string
@@ -42,7 +40,15 @@ func (cache *Cache) Wait() {
 	cache.wg.Wait()
 }
 
-func (cache *Cache) GetTileImage(z, x, y int) (image.Image, error) {
+func (cache *Cache) GetTile(z, x, y int) (*Tile, error) {
+	im, err := cache.getTileImage(z, x, y)
+	if err != nil {
+		return nil, err
+	}
+	return newTile(z, x, y, im), nil
+}
+
+func (cache *Cache) getTileImage(z, x, y int) (image.Image, error) {
 	path := cache.tilePath(z, x, y)
 	file, err := os.Open(path)
 	if err != nil {
@@ -50,29 +56,6 @@ func (cache *Cache) GetTileImage(z, x, y int) (image.Image, error) {
 	}
 	defer file.Close()
 	return png.Decode(file)
-}
-
-func (cache *Cache) GetTileElevation(z, x, y int) ([]float64, error) {
-	im, err := cache.GetTileImage(z, x, y)
-	if err != nil {
-		return nil, err
-	}
-	rgba := im.(*image.RGBA)
-	buf := make([]float64, TileSize*TileSize)
-	index := 0
-	for y := 0; y < TileSize; y++ {
-		i := rgba.PixOffset(0, y)
-		for x := 0; x < TileSize; x++ {
-			r := float64(rgba.Pix[i+0])
-			g := float64(rgba.Pix[i+1])
-			b := float64(rgba.Pix[i+2])
-			meters := (r*256 + g + b/256) - 32768
-			buf[index] = meters
-			index += 1
-			i += 4
-		}
-	}
-	return buf, nil
 }
 
 func (cache *Cache) tileURL(z, x, y int) string {
