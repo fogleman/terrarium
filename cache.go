@@ -100,6 +100,5 @@ func (cache *Cache) downloadTile(z, x, y int) error {
 	response, err := http.Get(url)
 	defer response.Body.Close()
 	_, err = io.Copy(file, response.Body)
-	defer fmt.Println(path)
 	return err
 }

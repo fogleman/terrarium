@@ -17,9 +17,14 @@ const (
 )
 
 const (
-	Z          = 11
-	Lat0, Lng0 = 35.2, -114.2
-	Lat1, Lng1 = 37.0, -111.4
+	Step = 100
+	Z    = 11
+	// Lat0, Lng0 = 35.2, -114.2
+	// Lat1, Lng1 = 37.0, -111.4
+	// Lat0, Lng0 = 40.897351, -73.835237
+	// Lat1, Lng1 = 42.061636, -71.731624
+	Lat0, Lng0 = 36.998769, -109.045342
+	Lat1, Lng1 = 41.002267, -102.051749
 )
 
 func main() {
@@ -37,9 +42,10 @@ func main() {
 	}
 	x1++
 	y1++
-	fmt.Println(x0, x1)
-	fmt.Println(y0, y1)
+	n := (y1 - y0) * (x1 - x0)
+	fmt.Printf("%d tiles\n", n)
 
+	fmt.Println("downloading tiles...")
 	cache := terrarium.NewCache(URLTemplate, CacheDirectory, MaxDownloads)
 	for y := y0; y < y1; y++ {
 		for x := x0; x < x1; x++ {
@@ -48,20 +54,25 @@ func main() {
 	}
 	cache.Wait()
 
+	fmt.Println("extracting contour lines...")
 	var paths []terrarium.Path
+	i := 0
 	for y := y0; y < y1; y++ {
 		for x := x0; x < x1; x++ {
 			tile, err := cache.GetTile(Z, x, y)
 			if err != nil {
 				panic(err)
 			}
-			for z := 0; z < 5000; z += 100 {
+			for z := -500; z < 5000; z += Step {
 				p := tile.ContourLines(float64(z))
 				paths = append(paths, p...)
 			}
+			i++
+			fmt.Println(i, n)
 		}
 	}
 
+	fmt.Println("projecting paths...")
 	proj := maps.NewMercatorProjection()
 	for _, path := range paths {
 		for i, p := range path {
@@ -71,7 +82,8 @@ func main() {
 		}
 	}
 
-	im := renderPaths(paths, 4096, 0, 1.5)
+	fmt.Println("rendering output...")
+	im := renderPaths(paths, 4096, 0, 1)
 	gg.SavePNG("out.png", im)
 }
 

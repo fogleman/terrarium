@@ -50,10 +50,12 @@ func imageToElevation(im *image.RGBA) []float64 {
 }
 
 type Tile struct {
-	Z, X, Y   int
-	W, H      int
-	Image     *image.RGBA
-	Elevation []float64
+	Z, X, Y      int
+	W, H         int
+	Image        *image.RGBA
+	Elevation    []float64
+	MinElevation float64
+	MaxElevation float64
 }
 
 func newTile(z, x, y int, im image.Image) *Tile {
@@ -61,10 +63,23 @@ func newTile(z, x, y int, im image.Image) *Tile {
 	w := rgba.Bounds().Size().X
 	h := rgba.Bounds().Size().Y
 	elevation := imageToElevation(rgba)
-	return &Tile{z, x, y, w, h, rgba, elevation}
+	lo := elevation[0]
+	hi := elevation[0]
+	for _, e := range elevation {
+		if e < lo {
+			lo = e
+		}
+		if e > hi {
+			hi = e
+		}
+	}
+	return &Tile{z, x, y, w, h, rgba, elevation, lo, hi}
 }
 
 func (tile *Tile) ContourLines(z float64) []Path {
+	if z < tile.MinElevation || z > tile.MaxElevation {
+		return nil
+	}
 	nw := TileLatLng(tile.Z, tile.X, tile.Y)
 	se := TileLatLng(tile.Z, tile.X+1, tile.Y+1)
 	pairs := slice(tile.Elevation, tile.W, tile.H, z+1e-7)
