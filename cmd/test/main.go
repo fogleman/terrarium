@@ -11,20 +11,21 @@ import (
 )
 
 const (
-	Step = 50
-	Z    = 12
+	Step = 100
+	Z    = 10
 
-	Country = ""
+	Country = "Iceland"
 	State   = ""
-	County  = "Russell"
-	STATEFP = "51"
+	County  = ""
+	STATEFP = ""
 
 	CountryShapefile = "ne_10m_admin_0_countries/wgs84.shp"
 	StateShapefile   = "cb_2016_us_state_500k/wgs84.shp"
 	CountyShapefile  = "cb_2016_us_county_500k/wgs84.shp"
-	URLTemplate      = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
-	CacheDirectory   = "cache"
-	MaxDownloads     = 16
+
+	URLTemplate    = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
+	CacheDirectory = "cache"
+	MaxDownloads   = 16
 )
 
 func loadShapes() []maps.Shape {
@@ -103,8 +104,15 @@ func boundsForShapes(shapes []maps.Shape) (min, max terrarium.Point) {
 
 func main() {
 	shapes := loadShapes()
-	// return
+	if len(shapes) == 0 {
+		fmt.Println("no shapes!")
+		return
+	}
 	min, max := boundsForShapes(shapes)
+
+	// shapes = nil
+	// min = terrarium.LatLng(35.894577, -112.739656)
+	// max = terrarium.LatLng(36.591909, -111.636161)
 
 	p0 := terrarium.TileXY(Z, min)
 	p1 := terrarium.TileXY(Z, max)
@@ -141,7 +149,7 @@ func main() {
 			if err != nil {
 				panic(err)
 			}
-			for z := -500; z < 5000; z += Step {
+			for z := -500; z < 9000; z += Step {
 				p := tile.ContourLines(float64(z))
 				paths = append(paths, p...)
 			}
@@ -207,15 +215,17 @@ func renderPaths(shapes []maps.Shape, paths []terrarium.Path, size, pad int, lw 
 	dc.Translate(float64(pad), float64(pad))
 	dc.Scale(scale, scale)
 	dc.Translate(-x0, -y0)
-	for _, shape := range shapes {
-		for _, line := range shape.Lines {
-			dc.NewSubPath()
-			for _, p := range line.Points {
-				dc.LineTo(p.X, p.Y)
+	if len(shapes) > 0 {
+		for _, shape := range shapes {
+			for _, line := range shape.Lines {
+				dc.NewSubPath()
+				for _, p := range line.Points {
+					dc.LineTo(p.X, p.Y)
+				}
 			}
 		}
+		dc.Clip()
 	}
-	dc.Clip()
 	for _, path := range paths {
 		dc.NewSubPath()
 		for _, p := range path {
