@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"math"
+	"runtime"
 
 	"github.com/fogleman/gg"
 	"github.com/fogleman/maps"
@@ -140,22 +141,24 @@ func main() {
 	}
 	cache.Wait()
 
-	fmt.Println("extracting contour lines...")
-	var paths []terrarium.Path
-	i := 0
+	fmt.Println("processing tiles...")
+	jobs := make(chan job, n)
+	results := make(chan []terrarium.Path, n)
+	wn := runtime.NumCPU()
+	for wi := 0; wi < wn; wi++ {
+		go worker(cache, jobs, results)
+	}
 	for y := y0; y < y1; y++ {
 		for x := x0; x < x1; x++ {
-			tile, err := cache.GetStitchedTile(Z, x, y)
-			if err != nil {
-				panic(err)
-			}
-			for z := -600; z < 9000; z += Step {
-				p := tile.MaskedContourLines(float64(z), shapes)
-				paths = append(paths, p...)
-			}
-			i++
-			fmt.Println(i, n)
+			jobs <- job{Z, x, y, shapes}
 		}
+	}
+	close(jobs)
+	var paths []terrarium.Path
+	for i := 0; i < n; i++ {
+		p := <-results
+		paths = append(paths, p...)
+		// fmt.Println(i+1, n)
 	}
 
 	fmt.Println("projecting paths...")
@@ -177,9 +180,31 @@ func main() {
 		}
 	}
 
-	fmt.Println("rendering output...")
+	fmt.Println("rendering image...")
 	im := renderPaths(shapes, paths, 4096, 64, 1)
+
+	fmt.Println("writing output...")
 	gg.SavePNG("out.png", im)
+}
+
+type job struct {
+	Z, X, Y int
+	Shapes  []maps.Shape
+}
+
+func worker(cache *terrarium.Cache, in chan job, out chan []terrarium.Path) {
+	for j := range in {
+		tile, err := cache.GetStitchedTile(j.Z, j.X, j.Y)
+		if err != nil {
+			panic(err)
+		}
+		var paths []terrarium.Path
+		for z := -600; z < 9000; z += Step {
+			p := tile.MaskedContourLines(float64(z), j.Shapes)
+			paths = append(paths, p...)
+		}
+		out <- paths
+	}
 }
 
 func renderPaths(shapes []maps.Shape, paths []terrarium.Path, size, pad int, lw float64) image.Image {
