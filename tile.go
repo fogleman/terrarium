@@ -3,6 +3,9 @@ package terrarium
 import (
 	"image"
 	"math"
+
+	"github.com/fogleman/gg"
+	"github.com/fogleman/maps"
 )
 
 const TileSize = 256
@@ -77,12 +80,30 @@ func newTile(z, x, y int, im image.Image) *Tile {
 }
 
 func (tile *Tile) ContourLines(z float64) []Path {
+	return tile.MaskedContourLines(z, nil)
+}
+
+func (tile *Tile) MaskedContourLines(z float64, shapes []maps.Shape) []Path {
 	if z < tile.MinElevation || z > tile.MaxElevation {
 		return nil
 	}
 	nw := TileLatLng(tile.Z, tile.X, tile.Y)
 	se := TileLatLng(tile.Z, tile.X+1, tile.Y+1)
 	pairs := slice(tile.Elevation, tile.W, tile.H, z+1e-7)
+	if len(shapes) > 0 {
+		mask := tile.renderMask(shapes)
+		maskedPairs := pairs[:0]
+		for _, p := range pairs {
+			if mask.AlphaAt(int(p.A.X), int(p.A.Y)).A != 255 {
+				continue
+			}
+			if mask.AlphaAt(int(p.B.X), int(p.B.Y)).A != 255 {
+				continue
+			}
+			maskedPairs = append(maskedPairs, p)
+		}
+		pairs = maskedPairs
+	}
 	for i, p := range pairs {
 		x0 := nw.X + (se.X-nw.X)*(p.A.X/TileSize)
 		y0 := nw.Y + (se.Y-nw.Y)*(p.A.Y/TileSize)
@@ -91,4 +112,23 @@ func (tile *Tile) ContourLines(z float64) []Path {
 		pairs[i] = pair{Point{x0, y0}, Point{x1, y1}}
 	}
 	return joinPairs(pairs)
+}
+
+func (tile *Tile) renderMask(shapes []maps.Shape) *image.Alpha {
+	nw := TileLatLng(tile.Z, tile.X, tile.Y)
+	se := TileLatLng(tile.Z, tile.X+1, tile.Y+1)
+	dc := gg.NewContext(TileSize, TileSize)
+	for _, shape := range shapes {
+		for _, line := range shape.Lines {
+			dc.NewSubPath()
+			for _, p := range line.Points {
+				x := (p.X - nw.X) / (se.X - nw.X) * TileSize
+				y := (p.Y - nw.Y) / (se.Y - nw.Y) * TileSize
+				dc.LineTo(x, y)
+			}
+		}
+	}
+	dc.SetRGB(0, 0, 0)
+	dc.Fill()
+	return dc.AsMask()
 }

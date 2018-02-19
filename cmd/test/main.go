@@ -11,11 +11,11 @@ import (
 )
 
 const (
-	Step = 100
+	Step = 200
 	Z    = 10
 
-	Country = "Iceland"
-	State   = ""
+	Country = ""
+	State   = "AZ"
 	County  = ""
 	STATEFP = ""
 
@@ -149,8 +149,8 @@ func main() {
 			if err != nil {
 				panic(err)
 			}
-			for z := -500; z < 9000; z += Step {
-				p := tile.ContourLines(float64(z))
+			for z := -600; z < 9000; z += Step {
+				p := tile.MaskedContourLines(float64(z), shapes)
 				paths = append(paths, p...)
 			}
 			i++
@@ -178,7 +178,7 @@ func main() {
 	}
 
 	fmt.Println("rendering output...")
-	im := renderPaths(shapes, paths, 4096, 0, 1)
+	im := renderPaths(shapes, paths, 4096, 64, 1)
 	gg.SavePNG("out.png", im)
 }
 
@@ -203,6 +203,24 @@ func renderPaths(shapes []maps.Shape, paths []terrarium.Path, size, pad int, lw 
 			}
 		}
 	}
+	for _, shape := range shapes {
+		for _, line := range shape.Lines {
+			for _, p := range line.Points {
+				if p.X < x0 {
+					x0 = p.X
+				}
+				if p.X > x1 {
+					x1 = p.X
+				}
+				if p.Y < y0 {
+					y0 = p.Y
+				}
+				if p.Y > y1 {
+					y1 = p.Y
+				}
+			}
+		}
+	}
 	pw := x1 - x0
 	ph := y1 - y0
 	sx := float64(size-pad*2) / pw
@@ -215,17 +233,6 @@ func renderPaths(shapes []maps.Shape, paths []terrarium.Path, size, pad int, lw 
 	dc.Translate(float64(pad), float64(pad))
 	dc.Scale(scale, scale)
 	dc.Translate(-x0, -y0)
-	if len(shapes) > 0 {
-		for _, shape := range shapes {
-			for _, line := range shape.Lines {
-				dc.NewSubPath()
-				for _, p := range line.Points {
-					dc.LineTo(p.X, p.Y)
-				}
-			}
-		}
-		dc.Clip()
-	}
 	for _, path := range paths {
 		dc.NewSubPath()
 		for _, p := range path {
@@ -235,7 +242,6 @@ func renderPaths(shapes []maps.Shape, paths []terrarium.Path, size, pad int, lw 
 	dc.SetRGB(0, 0, 0)
 	dc.SetLineWidth(lw)
 	dc.Stroke()
-	dc.ResetClip()
 	for _, shape := range shapes {
 		for _, line := range shape.Lines {
 			dc.NewSubPath()
