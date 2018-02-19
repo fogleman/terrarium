@@ -5,7 +5,7 @@ import (
 	"math"
 )
 
-// const TileSize = 256
+const TileSize = 256
 
 func TileXY(z int, p Point) IntPoint {
 	f := TileXYFloat(z, p)
@@ -84,10 +84,10 @@ func (tile *Tile) ContourLines(z float64) []Path {
 	se := TileLatLng(tile.Z, tile.X+1, tile.Y+1)
 	pairs := slice(tile.Elevation, tile.W, tile.H, z+1e-7)
 	for i, p := range pairs {
-		x0 := nw.X + (se.X-nw.X)*(p.A.X/256)
-		y0 := nw.Y + (se.Y-nw.Y)*(p.A.Y/256)
-		x1 := nw.X + (se.X-nw.X)*(p.B.X/256)
-		y1 := nw.Y + (se.Y-nw.Y)*(p.B.Y/256)
+		x0 := nw.X + (se.X-nw.X)*(p.A.X/TileSize)
+		y0 := nw.Y + (se.Y-nw.Y)*(p.A.Y/TileSize)
+		x1 := nw.X + (se.X-nw.X)*(p.B.X/TileSize)
+		y1 := nw.Y + (se.Y-nw.Y)*(p.B.Y/TileSize)
 		pairs[i] = pair{Point{x0, y0}, Point{x1, y1}}
 	}
 	return joinPairs(pairs)

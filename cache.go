@@ -48,6 +48,14 @@ func (cache *Cache) GetTile(z, x, y int) (*Tile, error) {
 	return newTile(z, x, y, im), nil
 }
 
+func (cache *Cache) GetStitchedTile(z, x, y int) (*Tile, error) {
+	im, err := stitchTile(cache, z, x, y)
+	if err != nil {
+		return nil, err
+	}
+	return newTile(z, x, y, im), nil
+}
+
 func (cache *Cache) getTileImage(z, x, y int) (image.Image, error) {
 	path := cache.tilePath(z, x, y)
 	file, err := os.Open(path)
@@ -100,5 +108,6 @@ func (cache *Cache) downloadTile(z, x, y int) error {
 	response, err := http.Get(url)
 	defer response.Body.Close()
 	_, err = io.Copy(file, response.Body)
+	fmt.Println(path)
 	return err
 }

@@ -17,14 +17,14 @@ const (
 )
 
 const (
-	Step = 100
-	Z    = 11
-	// Lat0, Lng0 = 35.2, -114.2
-	// Lat1, Lng1 = 37.0, -111.4
+	Step       = 100
+	Z          = 8
+	Lat0, Lng0 = 35.2, -114.2
+	Lat1, Lng1 = 37.0, -111.4
 	// Lat0, Lng0 = 40.897351, -73.835237
 	// Lat1, Lng1 = 42.061636, -71.731624
-	Lat0, Lng0 = 36.998769, -109.045342
-	Lat1, Lng1 = 41.002267, -102.051749
+	// Lat0, Lng0 = 36.998769, -109.045342
+	// Lat1, Lng1 = 41.002267, -102.051749
 )
 
 func main() {
@@ -47,8 +47,8 @@ func main() {
 
 	fmt.Println("downloading tiles...")
 	cache := terrarium.NewCache(URLTemplate, CacheDirectory, MaxDownloads)
-	for y := y0; y < y1; y++ {
-		for x := x0; x < x1; x++ {
+	for y := y0; y <= y1; y++ {
+		for x := x0; x <= x1; x++ {
 			cache.EnsureTile(Z, x, y)
 		}
 	}
@@ -59,7 +59,7 @@ func main() {
 	i := 0
 	for y := y0; y < y1; y++ {
 		for x := x0; x < x1; x++ {
-			tile, err := cache.GetTile(Z, x, y)
+			tile, err := cache.GetStitchedTile(Z, x, y)
 			if err != nil {
 				panic(err)
 			}
