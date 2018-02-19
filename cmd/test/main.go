@@ -11,15 +11,17 @@ import (
 )
 
 const (
-	Step    = 200
-	Z       = 9
-	State   = "UT"
-	Country = ""
-)
+	Step = 50
+	Z    = 12
 
-const (
-	StateShapefile   = "cb_2016_us_state_500k/wgs84.shp"
+	Country = ""
+	State   = ""
+	County  = "Russell"
+	STATEFP = "51"
+
 	CountryShapefile = "ne_10m_admin_0_countries/wgs84.shp"
+	StateShapefile   = "cb_2016_us_state_500k/wgs84.shp"
+	CountyShapefile  = "cb_2016_us_county_500k/wgs84.shp"
 	URLTemplate      = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
 	CacheDirectory   = "cache"
 	MaxDownloads     = 16
@@ -48,6 +50,20 @@ func loadShapes() []maps.Shape {
 		filteredShapes := shapes[:0]
 		for _, shape := range shapes {
 			if shape.Tags["STUSPS"] == State {
+				filteredShapes = append(filteredShapes, shape)
+			}
+		}
+		result = append(result, filteredShapes...)
+	}
+	if County != "" {
+		shapes, err := maps.LoadShapefile(CountyShapefile)
+		if err != nil {
+			panic(err)
+		}
+		filteredShapes := shapes[:0]
+		for _, shape := range shapes {
+			if shape.Tags["NAME"] == County && shape.Tags["STATEFP"] == STATEFP {
+				fmt.Println(shape.Tags)
 				filteredShapes = append(filteredShapes, shape)
 			}
 		}
@@ -87,6 +103,7 @@ func boundsForShapes(shapes []maps.Shape) (min, max terrarium.Point) {
 
 func main() {
 	shapes := loadShapes()
+	// return
 	min, max := boundsForShapes(shapes)
 
 	p0 := terrarium.TileXY(Z, min)
@@ -208,6 +225,7 @@ func renderPaths(shapes []maps.Shape, paths []terrarium.Path, size, pad int, lw 
 	dc.SetRGB(0, 0, 0)
 	dc.SetLineWidth(lw)
 	dc.Stroke()
+	dc.ResetClip()
 	for _, shape := range shapes {
 		for _, line := range shape.Lines {
 			dc.NewSubPath()
