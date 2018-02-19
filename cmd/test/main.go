@@ -11,25 +11,86 @@ import (
 )
 
 const (
-	URLTemplate    = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
-	CacheDirectory = "cache"
-	MaxDownloads   = 16
+	Step    = 200
+	Z       = 9
+	State   = "UT"
+	Country = ""
 )
 
 const (
-	Step       = 100
-	Z          = 8
-	Lat0, Lng0 = 35.2, -114.2
-	Lat1, Lng1 = 37.0, -111.4
-	// Lat0, Lng0 = 40.897351, -73.835237
-	// Lat1, Lng1 = 42.061636, -71.731624
-	// Lat0, Lng0 = 36.998769, -109.045342
-	// Lat1, Lng1 = 41.002267, -102.051749
+	StateShapefile   = "cb_2016_us_state_500k/wgs84.shp"
+	CountryShapefile = "ne_10m_admin_0_countries/wgs84.shp"
+	URLTemplate      = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
+	CacheDirectory   = "cache"
+	MaxDownloads     = 16
 )
 
+func loadShapes() []maps.Shape {
+	var result []maps.Shape
+	if Country != "" {
+		shapes, err := maps.LoadShapefile(CountryShapefile)
+		if err != nil {
+			panic(err)
+		}
+		filteredShapes := shapes[:0]
+		for _, shape := range shapes {
+			if shape.Tags["NAME"] == Country {
+				filteredShapes = append(filteredShapes, shape)
+			}
+		}
+		result = append(result, filteredShapes...)
+	}
+	if State != "" {
+		shapes, err := maps.LoadShapefile(StateShapefile)
+		if err != nil {
+			panic(err)
+		}
+		filteredShapes := shapes[:0]
+		for _, shape := range shapes {
+			if shape.Tags["STUSPS"] == State {
+				filteredShapes = append(filteredShapes, shape)
+			}
+		}
+		result = append(result, filteredShapes...)
+	}
+	return result
+}
+
+func boundsForShapes(shapes []maps.Shape) (min, max terrarium.Point) {
+	var x0, y0, x1, y1 float64
+	x0 = 180
+	x1 = -180
+	y0 = 90
+	y1 = -90
+	for _, shape := range shapes {
+		for _, line := range shape.Lines {
+			for _, p := range line.Points {
+				if p.X < x0 {
+					x0 = p.X
+				}
+				if p.Y < y0 {
+					y0 = p.Y
+				}
+				if p.X > x1 {
+					x1 = p.X
+				}
+				if p.Y > y1 {
+					y1 = p.Y
+				}
+			}
+		}
+	}
+	min = terrarium.Point{x0, y0}
+	max = terrarium.Point{x1, y1}
+	return
+}
+
 func main() {
-	p0 := terrarium.TileXY(Z, terrarium.LatLng(Lat0, Lng0))
-	p1 := terrarium.TileXY(Z, terrarium.LatLng(Lat1, Lng1))
+	shapes := loadShapes()
+	min, max := boundsForShapes(shapes)
+
+	p0 := terrarium.TileXY(Z, min)
+	p1 := terrarium.TileXY(Z, max)
 	x0 := p0.X
 	y0 := p0.Y
 	x1 := p1.X
@@ -81,13 +142,22 @@ func main() {
 			path[i].Y = q.Y
 		}
 	}
+	for _, shape := range shapes {
+		for _, line := range shape.Lines {
+			for i, p := range line.Points {
+				q := proj.Project(maps.Point{p.X, p.Y})
+				line.Points[i].X = q.X
+				line.Points[i].Y = q.Y
+			}
+		}
+	}
 
 	fmt.Println("rendering output...")
-	im := renderPaths(paths, 4096, 0, 1)
+	im := renderPaths(shapes, paths, 4096, 0, 1)
 	gg.SavePNG("out.png", im)
 }
 
-func renderPaths(paths []terrarium.Path, size, pad int, lw float64) image.Image {
+func renderPaths(shapes []maps.Shape, paths []terrarium.Path, size, pad int, lw float64) image.Image {
 	x0 := paths[0][0].X
 	x1 := paths[0][0].X
 	y0 := paths[0][0].Y
@@ -120,6 +190,15 @@ func renderPaths(paths []terrarium.Path, size, pad int, lw float64) image.Image 
 	dc.Translate(float64(pad), float64(pad))
 	dc.Scale(scale, scale)
 	dc.Translate(-x0, -y0)
+	for _, shape := range shapes {
+		for _, line := range shape.Lines {
+			dc.NewSubPath()
+			for _, p := range line.Points {
+				dc.LineTo(p.X, p.Y)
+			}
+		}
+	}
+	dc.Clip()
 	for _, path := range paths {
 		dc.NewSubPath()
 		for _, p := range path {
@@ -128,6 +207,16 @@ func renderPaths(paths []terrarium.Path, size, pad int, lw float64) image.Image 
 	}
 	dc.SetRGB(0, 0, 0)
 	dc.SetLineWidth(lw)
+	dc.Stroke()
+	for _, shape := range shapes {
+		for _, line := range shape.Lines {
+			dc.NewSubPath()
+			for _, p := range line.Points {
+				dc.LineTo(p.X, p.Y)
+			}
+		}
+	}
+	dc.SetLineWidth(lw * 3)
 	dc.Stroke()
 	return dc.Image()
 }
