@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"image"
 	"math"
+	"os"
 	"runtime"
 
 	"github.com/fogleman/gg"
@@ -14,15 +16,18 @@ import (
 const (
 	Step          = 100
 	Z             = 10
-	Size          = 4096
-	Padding       = 0
+	Size          = 2048
+	Padding       = 32
 	LineWidth     = 1
-	HistogramStep = 10
+	HistogramStep = 100
 
 	Country = ""
 	State   = "AZ"
 	County  = ""
 	STATEFP = ""
+
+	Lat0, Lng0 = 35.915391, -112.644693
+	Lat1, Lng1 = 36.487777, -111.546171
 
 	CountryShapefile = "ne_10m_admin_0_countries/wgs84.shp"
 	StateShapefile   = "cb_2016_us_state_500k/wgs84.shp"
@@ -33,105 +38,61 @@ const (
 	MaxDownloads   = 16
 )
 
-func loadShapes() []maps.Shape {
+func loadShapes() ([]maps.Shape, error) {
 	var result []maps.Shape
 	if Country != "" {
-		shapes, err := maps.LoadShapefile(CountryShapefile)
+		shapes, err := maps.LoadShapefile(CountryShapefile,
+			maps.NewShapeTagFilter("NAME", Country))
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
-		filteredShapes := shapes[:0]
-		for _, shape := range shapes {
-			if shape.Tags["NAME"] == Country {
-				filteredShapes = append(filteredShapes, shape)
-			}
-		}
-		result = append(result, filteredShapes...)
-	}
-	if State != "" {
-		shapes, err := maps.LoadShapefile(StateShapefile)
+		result = append(result, shapes...)
+	} else if State != "" {
+		shapes, err := maps.LoadShapefile(StateShapefile,
+			maps.NewShapeTagFilter("STUSPS", State))
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
-		filteredShapes := shapes[:0]
-		for _, shape := range shapes {
-			if shape.Tags["STUSPS"] == State {
-				filteredShapes = append(filteredShapes, shape)
-			}
-		}
-		result = append(result, filteredShapes...)
-	}
-	if County != "" {
-		shapes, err := maps.LoadShapefile(CountyShapefile)
+		result = append(result, shapes...)
+	} else if County != "" {
+		shapes, err := maps.LoadShapefile(CountyShapefile,
+			maps.NewShapeTagFilter("NAME", County),
+			maps.NewShapeTagFilter("STATEFP", STATEFP))
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
-		filteredShapes := shapes[:0]
-		for _, shape := range shapes {
-			if shape.Tags["NAME"] == County && shape.Tags["STATEFP"] == STATEFP {
-				fmt.Println(shape.Tags)
-				filteredShapes = append(filteredShapes, shape)
-			}
-		}
-		result = append(result, filteredShapes...)
+		result = append(result, shapes...)
+	} else {
+		min := terrarium.LatLng(Lat0, Lng0)
+		max := terrarium.LatLng(Lat1, Lng1)
+		bounds := maps.Bounds{maps.Point(min), maps.Point(max)}
+		line := maps.NewPolyline([]maps.Point{
+			maps.Point{min.X, min.Y},
+			maps.Point{max.X, min.Y},
+			maps.Point{max.X, max.Y},
+			maps.Point{min.X, max.Y},
+			maps.Point{min.X, min.Y},
+		})
+		shape := maps.Shape{bounds, []*maps.Polyline{line}, nil}
+		result = append(result, shape)
 	}
-	return result
-}
-
-func boundsForShapes(shapes []maps.Shape) (min, max terrarium.Point) {
-	var x0, y0, x1, y1 float64
-	x0 = 180
-	x1 = -180
-	y0 = 90
-	y1 = -90
-	for _, shape := range shapes {
-		for _, line := range shape.Lines {
-			for _, p := range line.Points {
-				if p.X < x0 {
-					x0 = p.X
-				}
-				if p.Y < y0 {
-					y0 = p.Y
-				}
-				if p.X > x1 {
-					x1 = p.X
-				}
-				if p.Y > y1 {
-					y1 = p.Y
-				}
-			}
-		}
-	}
-	min = terrarium.Point{x0, y0}
-	max = terrarium.Point{x1, y1}
-	return
+	return result, nil
 }
 
 func main() {
-	shapes := loadShapes()
+	shapes, err := loadShapes()
+	if err != nil {
+		panic(err)
+	}
 	if len(shapes) == 0 {
 		fmt.Println("no shapes!")
 		return
 	}
-	min, max := boundsForShapes(shapes)
-
-	// min = terrarium.LatLng(20.798543, -11.676047)
-	// max = terrarium.LatLng(21.321997, -11.113004)
-	// shapes = nil
-
-	// shapes = nil
-	// min = terrarium.LatLng(35.9, -112.6)
-	// max = terrarium.LatLng(36.475, -111.6)
-
-	// line := maps.NewPolyline([]maps.Point{
-	// 	maps.Point{min.X, min.Y},
-	// 	maps.Point{max.X, min.Y},
-	// 	maps.Point{max.X, max.Y},
-	// 	maps.Point{min.X, max.Y},
-	// 	maps.Point{min.X, min.Y},
-	// })
-	// shape := maps.Shape{maps.Bounds{}, []*maps.Polyline{line}, nil}
-	// shapes = append(shapes, shape)
+	bounds := maps.BoundsForShapes(shapes...)
+	min := terrarium.Point(bounds.Min)
+	max := terrarium.Point(bounds.Max)
+	fmt.Println(min)
+	fmt.Println(max)
 
 	p0 := terrarium.TileXY(Z, min)
 	p1 := terrarium.TileXY(Z, max)
@@ -183,38 +144,52 @@ func main() {
 
 	fmt.Println("projecting paths...")
 	proj := maps.NewMercatorProjection()
+	proj.InvertY = true
 	for _, path := range paths {
 		for i, p := range path {
-			q := proj.Project(maps.Point{p.X, p.Y})
+			q := proj.Project(maps.Point(p))
 			path[i].X = q.X
 			path[i].Y = q.Y
 		}
 	}
 	for _, shape := range shapes {
 		for _, line := range shape.Lines {
-			for i, p := range line.Points {
-				q := proj.Project(maps.Point{p.X, p.Y})
-				line.Points[i].X = q.X
-				line.Points[i].Y = q.Y
+			var path terrarium.Path
+			for _, p := range line.Points {
+				q := proj.Project(maps.Point(p))
+				path = append(path, terrarium.Point(q))
 			}
+			paths = append(paths, path)
 		}
 	}
 
 	fmt.Println("rendering image...")
-	im := renderPaths(shapes, paths, Size, Padding, LineWidth)
+	im := renderPaths(paths, Size, Padding, LineWidth)
 
-	fmt.Println("writing output...")
+	fmt.Println("writing png...")
 	gg.SavePNG("out.png", im)
 
-	// for _, path := range paths {
-	// 	for i, p := range path {
-	// 		if i != 0 {
-	// 			fmt.Printf(" ")
-	// 		}
-	// 		fmt.Printf("%g,%g", p.X, p.Y)
-	// 	}
-	// 	fmt.Println()
-	// }
+	// fmt.Println("writing axi...")
+	// saveAxi("out.axi", paths)
+}
+
+func saveAxi(filename string, paths []terrarium.Path) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	w := bufio.NewWriter(file)
+	for _, path := range paths {
+		for i, p := range path {
+			if i != 0 {
+				fmt.Fprintf(w, " ")
+			}
+			fmt.Fprintf(w, "%g,%g", p.X, p.Y)
+		}
+		fmt.Fprintln(w)
+	}
+	return w.Flush()
 }
 
 type job struct {
@@ -253,13 +228,14 @@ func worker(cache *terrarium.Cache, in chan job, out chan result) {
 		if err != nil {
 			panic(err)
 		}
+		tile.MaskShapes(j.Shapes)
 		var paths []terrarium.Path
 		for z := -600; z < 9000; z += Step {
-			p := tile.MaskedContourLines(float64(z), j.Shapes)
+			p := tile.MaskedContourLines(float64(z))
 			paths = append(paths, p...)
 		}
 		h := make(histogram)
-		for _, e := range tile.MaskedElevation(j.Shapes) {
+		for _, e := range tile.MaskedElevation() {
 			if e < tile.MinElevation {
 				continue
 			}
@@ -269,12 +245,11 @@ func worker(cache *terrarium.Cache, in chan job, out chan result) {
 	}
 }
 
-func renderPaths(shapes []maps.Shape, paths []terrarium.Path, size, pad int, lw float64) image.Image {
-	min, max := boundsForShapes(shapes)
-	x0 := min.X
-	x1 := max.X
-	y0 := min.Y
-	y1 := max.Y
+func renderPaths(paths []terrarium.Path, size, pad int, lw float64) image.Image {
+	x0 := paths[0][0].X
+	x1 := paths[0][0].X
+	y0 := paths[0][0].Y
+	y1 := paths[0][0].Y
 	for _, path := range paths {
 		for _, p := range path {
 			if p.X < x0 {
@@ -297,7 +272,6 @@ func renderPaths(shapes []maps.Shape, paths []terrarium.Path, size, pad int, lw 
 	sy := float64(size-pad*2) / ph
 	scale := math.Min(sx, sy)
 	dc := gg.NewContext(int(pw*scale)+pad*2, int(ph*scale)+pad*2)
-	dc.InvertY()
 	dc.SetRGB(1, 1, 1)
 	dc.Clear()
 	dc.Translate(float64(pad), float64(pad))
@@ -311,16 +285,6 @@ func renderPaths(shapes []maps.Shape, paths []terrarium.Path, size, pad int, lw 
 	}
 	dc.SetRGB(0, 0, 0)
 	dc.SetLineWidth(lw)
-	dc.Stroke()
-	for _, shape := range shapes {
-		for _, line := range shape.Lines {
-			dc.NewSubPath()
-			for _, p := range line.Points {
-				dc.LineTo(p.X, p.Y)
-			}
-		}
-	}
-	dc.SetLineWidth(lw * 3)
 	dc.Stroke()
 	return dc.Image()
 }

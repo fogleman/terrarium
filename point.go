@@ -8,8 +8,12 @@ type Point struct {
 	X, Y float64
 }
 
-type Path []Point
-
 func LatLng(lat, lng float64) Point {
 	return Point{lng, lat}
+}
+
+type Path []Point
+
+type Bounds struct {
+	Min, Max Point
 }

@@ -56,6 +56,7 @@ type Tile struct {
 	Z, X, Y      int
 	W, H         int
 	Image        *image.RGBA
+	Mask         *image.Alpha
 	Elevation    []float64
 	MinElevation float64
 	MaxElevation float64
@@ -76,22 +77,29 @@ func newTile(z, x, y int, im image.Image) *Tile {
 			hi = e
 		}
 	}
-	return &Tile{z, x, y, w, h, rgba, elevation, lo, hi}
+	return &Tile{z, x, y, w, h, rgba, nil, elevation, lo, hi}
+}
+
+func (tile *Tile) MaskShapes(shapes []maps.Shape) {
+	tile.Mask = tile.renderMask(shapes)
 }
 
 func (tile *Tile) ContourLines(z float64) []Path {
-	return tile.MaskedContourLines(z, nil)
+	return tile.contourLines(z, nil)
 }
 
-func (tile *Tile) MaskedContourLines(z float64, shapes []maps.Shape) []Path {
+func (tile *Tile) MaskedContourLines(z float64) []Path {
+	return tile.contourLines(z, tile.Mask)
+}
+
+func (tile *Tile) contourLines(z float64, mask *image.Alpha) []Path {
 	if z < tile.MinElevation || z > tile.MaxElevation {
 		return nil
 	}
 	nw := TileLatLng(tile.Z, tile.X, tile.Y)
 	se := TileLatLng(tile.Z, tile.X+1, tile.Y+1)
 	pairs := slice(tile.Elevation, tile.W, tile.H, z+1e-7)
-	if len(shapes) > 0 {
-		mask := tile.renderMask(shapes)
+	if mask != nil {
 		maskedPairs := pairs[:0]
 		for _, p := range pairs {
 			if mask.AlphaAt(int(p.A.X), int(p.A.Y)).A != 255 {
@@ -114,12 +122,12 @@ func (tile *Tile) MaskedContourLines(z float64, shapes []maps.Shape) []Path {
 	return joinPairs(pairs)
 }
 
-func (tile *Tile) MaskedElevation(shapes []maps.Shape) []float64 {
+func (tile *Tile) MaskedElevation() []float64 {
 	elevation := make([]float64, len(tile.Elevation))
 	copy(elevation, tile.Elevation)
-	if len(shapes) > 0 {
+	mask := tile.Mask
+	if mask != nil {
 		sentinel := tile.MinElevation - 1
-		mask := tile.renderMask(shapes)
 		i := 0
 		for y := 0; y < TileSize; y++ {
 			j := mask.PixOffset(0, y)
