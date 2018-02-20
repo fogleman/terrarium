@@ -12,8 +12,12 @@ import (
 )
 
 const (
-	Step = 200
-	Z    = 10
+	Step          = 100
+	Z             = 10
+	Size          = 4096
+	Padding       = 0
+	LineWidth     = 1
+	HistogramStep = 10
 
 	Country = ""
 	State   = "AZ"
@@ -111,9 +115,23 @@ func main() {
 	}
 	min, max := boundsForShapes(shapes)
 
+	// min = terrarium.LatLng(20.798543, -11.676047)
+	// max = terrarium.LatLng(21.321997, -11.113004)
 	// shapes = nil
-	// min = terrarium.LatLng(35.894577, -112.739656)
-	// max = terrarium.LatLng(36.591909, -111.636161)
+
+	// shapes = nil
+	// min = terrarium.LatLng(35.9, -112.6)
+	// max = terrarium.LatLng(36.475, -111.6)
+
+	// line := maps.NewPolyline([]maps.Point{
+	// 	maps.Point{min.X, min.Y},
+	// 	maps.Point{max.X, min.Y},
+	// 	maps.Point{max.X, max.Y},
+	// 	maps.Point{min.X, max.Y},
+	// 	maps.Point{min.X, min.Y},
+	// })
+	// shape := maps.Shape{maps.Bounds{}, []*maps.Polyline{line}, nil}
+	// shapes = append(shapes, shape)
 
 	p0 := terrarium.TileXY(Z, min)
 	p1 := terrarium.TileXY(Z, max)
@@ -143,7 +161,7 @@ func main() {
 
 	fmt.Println("processing tiles...")
 	jobs := make(chan job, n)
-	results := make(chan []terrarium.Path, n)
+	results := make(chan result, n)
 	wn := runtime.NumCPU()
 	for wi := 0; wi < wn; wi++ {
 		go worker(cache, jobs, results)
@@ -155,11 +173,13 @@ func main() {
 	}
 	close(jobs)
 	var paths []terrarium.Path
+	h := make(histogram)
 	for i := 0; i < n; i++ {
-		p := <-results
-		paths = append(paths, p...)
-		// fmt.Println(i+1, n)
+		r := <-results
+		paths = append(paths, r.Paths...)
+		h.Update(r.Histogram)
 	}
+	h.Print()
 
 	fmt.Println("projecting paths...")
 	proj := maps.NewMercatorProjection()
@@ -181,10 +201,20 @@ func main() {
 	}
 
 	fmt.Println("rendering image...")
-	im := renderPaths(shapes, paths, 4096, 64, 1)
+	im := renderPaths(shapes, paths, Size, Padding, LineWidth)
 
 	fmt.Println("writing output...")
 	gg.SavePNG("out.png", im)
+
+	// for _, path := range paths {
+	// 	for i, p := range path {
+	// 		if i != 0 {
+	// 			fmt.Printf(" ")
+	// 		}
+	// 		fmt.Printf("%g,%g", p.X, p.Y)
+	// 	}
+	// 	fmt.Println()
+	// }
 }
 
 type job struct {
@@ -192,7 +222,32 @@ type job struct {
 	Shapes  []maps.Shape
 }
 
-func worker(cache *terrarium.Cache, in chan job, out chan []terrarium.Path) {
+type result struct {
+	Paths     []terrarium.Path
+	Histogram histogram
+}
+
+type histogram map[int]int
+
+func (h histogram) Update(other histogram) {
+	for k, v := range other {
+		h[k] += v
+	}
+}
+
+func (h histogram) Print() {
+	total := 0
+	for z := -10000; z <= 10000; z += HistogramStep {
+		count := h[z]
+		total += count
+		if count > 0 {
+			fmt.Println(z, count)
+		}
+	}
+	fmt.Println(total)
+}
+
+func worker(cache *terrarium.Cache, in chan job, out chan result) {
 	for j := range in {
 		tile, err := cache.GetStitchedTile(j.Z, j.X, j.Y)
 		if err != nil {
@@ -203,15 +258,23 @@ func worker(cache *terrarium.Cache, in chan job, out chan []terrarium.Path) {
 			p := tile.MaskedContourLines(float64(z), j.Shapes)
 			paths = append(paths, p...)
 		}
-		out <- paths
+		h := make(histogram)
+		for _, e := range tile.MaskedElevation(j.Shapes) {
+			if e < tile.MinElevation {
+				continue
+			}
+			h[int(e/HistogramStep)*HistogramStep]++
+		}
+		out <- result{paths, h}
 	}
 }
 
 func renderPaths(shapes []maps.Shape, paths []terrarium.Path, size, pad int, lw float64) image.Image {
-	x0 := paths[0][0].X
-	x1 := paths[0][0].X
-	y0 := paths[0][0].Y
-	y1 := paths[0][0].Y
+	min, max := boundsForShapes(shapes)
+	x0 := min.X
+	x1 := max.X
+	y0 := min.Y
+	y1 := max.Y
 	for _, path := range paths {
 		for _, p := range path {
 			if p.X < x0 {
@@ -225,24 +288,6 @@ func renderPaths(shapes []maps.Shape, paths []terrarium.Path, size, pad int, lw 
 			}
 			if p.Y > y1 {
 				y1 = p.Y
-			}
-		}
-	}
-	for _, shape := range shapes {
-		for _, line := range shape.Lines {
-			for _, p := range line.Points {
-				if p.X < x0 {
-					x0 = p.X
-				}
-				if p.X > x1 {
-					x1 = p.X
-				}
-				if p.Y < y0 {
-					y0 = p.Y
-				}
-				if p.Y > y1 {
-					y1 = p.Y
-				}
 			}
 		}
 	}

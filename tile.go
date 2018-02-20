@@ -114,6 +114,27 @@ func (tile *Tile) MaskedContourLines(z float64, shapes []maps.Shape) []Path {
 	return joinPairs(pairs)
 }
 
+func (tile *Tile) MaskedElevation(shapes []maps.Shape) []float64 {
+	elevation := make([]float64, len(tile.Elevation))
+	copy(elevation, tile.Elevation)
+	if len(shapes) > 0 {
+		sentinel := tile.MinElevation - 1
+		mask := tile.renderMask(shapes)
+		i := 0
+		for y := 0; y < TileSize; y++ {
+			j := mask.PixOffset(0, y)
+			for x := 0; x < TileSize; x++ {
+				if mask.Pix[j] != 255 {
+					elevation[i] = sentinel
+				}
+				i++
+				j++
+			}
+		}
+	}
+	return elevation
+}
+
 func (tile *Tile) renderMask(shapes []maps.Shape) *image.Alpha {
 	nw := TileLatLng(tile.Z, tile.X, tile.Y)
 	se := TileLatLng(tile.Z, tile.X+1, tile.Y+1)

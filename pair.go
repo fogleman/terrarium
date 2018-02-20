@@ -4,7 +4,16 @@ type pair struct {
 	A, B Point
 }
 
+func pairsToPaths(pairs []pair) []Path {
+	paths := make([]Path, len(pairs))
+	for i, p := range pairs {
+		paths[i] = Path{p.A, p.B}
+	}
+	return paths
+}
+
 func joinPairs(pairs []pair) []Path {
+	// return pairsToPaths(pairs)
 	lookup := make(map[Point][]Point, len(pairs))
 	for _, pair := range pairs {
 		lookup[pair.A] = append(lookup[pair.A], pair.B)
