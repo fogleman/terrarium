@@ -14,28 +14,33 @@ import (
 )
 
 const (
-	Step          = 100
-	Z             = 10
+	Step          = 250
+	Z             = 9
 	Size          = 2048
-	Padding       = 32
+	Padding       = 0
 	LineWidth     = 1
 	HistogramStep = 100
 
 	Country = ""
-	State   = "AZ"
+	State   = "CO"
 	County  = ""
 	STATEFP = ""
 
-	Lat0, Lng0 = 35.915391, -112.644693
-	Lat1, Lng1 = 36.487777, -111.546171
+	Lat, Lng   = 37.042177, -82.025393
+	M          = 0.5
+	Lat0, Lng0 = Lat - 0.1*M, Lng - 0.175*M
+	Lat1, Lng1 = Lat + 0.1*M, Lng + 0.175*M
 
 	CountryShapefile = "ne_10m_admin_0_countries/wgs84.shp"
-	StateShapefile   = "cb_2016_us_state_500k/wgs84.shp"
-	CountyShapefile  = "cb_2016_us_county_500k/wgs84.shp"
+	// CountryShapefile = "TM_WORLD_BORDERS-0.3/wgs84.shp"
+	StateShapefile  = "cb_2016_us_state_500k/wgs84.shp"
+	CountyShapefile = "cb_2016_us_county_500k/wgs84.shp"
 
 	URLTemplate    = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
 	CacheDirectory = "cache"
-	MaxDownloads   = 16
+	// URLTemplate    = "https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png"
+	// CacheDirectory = "cache-osm"
+	MaxDownloads = 16
 )
 
 func loadShapes() ([]maps.Shape, error) {
@@ -120,6 +125,30 @@ func main() {
 	}
 	cache.Wait()
 
+	// {
+	// 	const TileSize = terrarium.TileSize
+	// 	w := (x1 - x0 + 1) * TileSize
+	// 	h := (y1 - y0 + 1) * TileSize
+	// 	im := image.NewRGBA(image.Rect(0, 0, w, h))
+	// 	for y := y0; y < y1; y++ {
+	// 		for x := x0; x < x1; x++ {
+	// 			tile, err := cache.GetTile(Z, x, y)
+	// 			if err != nil {
+	// 				panic(err)
+	// 			}
+	// 			tile.MaskShapes(shapes)
+	// 			tx0 := (x - x0) * TileSize
+	// 			ty0 := (y - y0) * TileSize
+	// 			tx1 := x0 + TileSize
+	// 			ty1 := y0 + TileSize
+	// 			r := image.Rect(tx0, ty0, tx1, ty1)
+	// 			draw.DrawMask(im, r, tile.Image, image.ZP, tile.Mask, image.ZP, draw.Src)
+	// 		}
+	// 	}
+	// 	gg.SavePNG("stitched.png", im)
+	// 	return
+	// }
+
 	fmt.Println("processing tiles...")
 	jobs := make(chan job, n)
 	results := make(chan result, n)
@@ -169,8 +198,8 @@ func main() {
 	fmt.Println("writing png...")
 	gg.SavePNG("out.png", im)
 
-	// fmt.Println("writing axi...")
-	// saveAxi("out.axi", paths)
+	fmt.Println("writing axi...")
+	saveAxi("out.axi", paths)
 }
 
 func saveAxi(filename string, paths []terrarium.Path) error {
@@ -230,8 +259,8 @@ func worker(cache *terrarium.Cache, in chan job, out chan result) {
 		}
 		tile.MaskShapes(j.Shapes)
 		var paths []terrarium.Path
-		for z := -600; z < 9000; z += Step {
-			p := tile.MaskedContourLines(float64(z))
+		for z := -10000; z < 10000; z += Step {
+			p := tile.MaskedContourLines(float64(z + 1))
 			paths = append(paths, p...)
 		}
 		h := make(histogram)
@@ -286,5 +315,9 @@ func renderPaths(paths []terrarium.Path, size, pad int, lw float64) image.Image 
 	dc.SetRGB(0, 0, 0)
 	dc.SetLineWidth(lw)
 	dc.Stroke()
+	// dc.Identity()
+	// dc.DrawCircle(float64(dc.Width()/2), float64(dc.Height()/2), 8)
+	// dc.SetRGBA(1, 0, 0, 0.9)
+	// dc.Fill()
 	return dc.Image()
 }
