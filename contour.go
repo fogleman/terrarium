@@ -83,3 +83,8 @@ func slice(grid []float64, w, h int, z float64) []pair {
 	}
 	return result
 }
+
+func Slice(grid []float64, w, h int, z float64) []Path {
+	pairs := slice(grid, w, h, z)
+	return joinPairs(pairs)
+}
