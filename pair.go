@@ -39,6 +39,13 @@ func joinPairs(pairs []pair) []Path {
 				break
 			}
 		}
+		// if len(path) < 10 {
+		// 	a := path[0]
+		// 	b := path[len(path)-1]
+		// 	if a.Distance(b) < 1e-6 {
+		// 		continue
+		// 	}
+		// }
 		result = append(result, path)
 	}
 	return result
