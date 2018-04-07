@@ -198,8 +198,8 @@ func main() {
 	fmt.Println("writing png...")
 	gg.SavePNG("out.png", im)
 
-	fmt.Println("writing axi...")
-	saveAxi("out.axi", paths)
+	// fmt.Println("writing axi...")
+	// saveAxi("out.axi", paths)
 }
 
 func saveAxi(filename string, paths []terrarium.Path) error {
