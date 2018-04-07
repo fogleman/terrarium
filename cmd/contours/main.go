@@ -13,8 +13,7 @@ import (
 )
 
 const (
-	Step      = 50
-	Size      = 8192
+	Size      = 1600
 	Padding   = 0
 	LineWidth = 1
 )
@@ -30,20 +29,20 @@ func main() {
 	h := gray.Bounds().Size().Y
 	a := gray16Grid(gray)
 
-	hist := make(map[float64]int)
-	for _, v := range a {
-		hist[v] += 1
-	}
+	// hist := make(map[float64]int)
+	// for _, v := range a {
+	// 	hist[v] += 1
+	// }
 	// for k := 0; k < 256; k++ {
 	// 	fmt.Println(k, hist[float64(k)])
 	// }
 
 	var paths []terrarium.Path
-	for i := 0; i < 65535; i += 128 {
+	for i := 0; i < 65535; i += 1024 {
 		z := float64(i)
-		if hist[z] == 0 {
-			continue
-		}
+		// if hist[z] == 0 {
+		// 	continue
+		// }
 		p := terrarium.Slice(a, w, h, z+1e-7)
 		fmt.Println(z, len(p))
 		paths = append(paths, p...)
