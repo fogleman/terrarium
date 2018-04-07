@@ -26,7 +26,7 @@ const (
 	County  = ""
 	STATEFP = ""
 
-	Lat, Lng   = 37.042177, -82.025393
+	Lat, Lng   = 43.482486, -110.780319
 	M          = 0.5
 	Lat0, Lng0 = Lat - 0.1*M, Lng - 0.175*M
 	Lat1, Lng1 = Lat + 0.1*M, Lng + 0.175*M
