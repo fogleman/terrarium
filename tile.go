@@ -2,6 +2,7 @@ package terrarium
 
 import (
 	"image"
+	"image/color"
 	"math"
 
 	"github.com/fogleman/gg"
@@ -78,6 +79,26 @@ func newTile(z, x, y int, im image.Image) *Tile {
 		}
 	}
 	return &Tile{z, x, y, w, h, rgba, nil, elevation, lo, hi}
+}
+
+func (tile *Tile) AsGray16(lo, hi float64) *image.Gray16 {
+	im := image.NewGray16(tile.Image.Bounds())
+	for y := 0; y < tile.H; y++ {
+		for x := 0; x < tile.W; x++ {
+			i := y*tile.W + x
+			e := tile.Elevation[i]
+			t := (e - lo) / (hi - lo)
+			if t < 0 {
+				t = 0
+			}
+			if t > 1 {
+				t = 1
+			}
+			v := uint16(t * 65535)
+			im.SetGray16(x, y, color.Gray16{v})
+		}
+	}
+	return im
 }
 
 func (tile *Tile) MaskShapes(shapes []maps.Shape) {
