@@ -13,15 +13,17 @@ import (
 )
 
 const (
-	Z = 13
+	Z = 12
 
 	// Iceland
 	// Lat0, Lng0 = 66.750108, -25.731168
 	// Lat1, Lng1 = 62.881496, -12.699955
 
 	// Grand Canyon
-	Lat0, Lng0 = 36.477988, -112.726473
-	Lat1, Lng1 = 35.940449, -111.561530
+	// Lat0, Lng0 = 36.477988, -112.726473
+	// Lat1, Lng1 = 35.940449, -111.561530
+	Lat0, Lng0 = 36.551589, -112.728958
+	Lat1, Lng1 = 35.886162, -111.688370
 
 	// Mount Everest
 	// Lat0, Lng0 = 28.413539, 86.467738
@@ -84,9 +86,9 @@ func main() {
 			hi = math.Max(hi, tile.MaxElevation)
 		}
 	}
-	fmt.Println(lo, hi)
+	// fmt.Println(lo, hi)
 
-	lo = -1
+	// lo = -1
 
 	fmt.Println("stitching tiles...")
 	const TileSize = terrarium.TileSize
@@ -148,7 +150,12 @@ func main() {
 	zScale := zMeters / avgMetersPerPixel
 	// fmt.Println(xMeters, yMeters, zMeters)
 	// fmt.Println(xMetersPerPixel, yMetersPerPixel)
-	fmt.Println(zScale)
+	fmt.Println("width =", trimmed.Bounds().Size().X)
+	fmt.Println("height =", trimmed.Bounds().Size().Y)
+	fmt.Println("min elevation =", lo)
+	fmt.Println("max elevation =", hi)
+	fmt.Println("elevation change =", hi-lo)
+	fmt.Println("z scale =", zScale)
 
 	gg.SavePNG("out.png", trimmed)
 
