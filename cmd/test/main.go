@@ -22,7 +22,7 @@ const (
 	HistogramStep = 100
 
 	Country = ""
-	State   = "CO"
+	State   = ""
 	County  = ""
 	STATEFP = ""
 

@@ -13,17 +13,29 @@ import (
 )
 
 const (
-	Z = 12
+	Z = 15
+
+	// Antelope Island
+	// Lat, Lng = 40.078190, -111.826498
+	// W, H     = 8, 16
+
+	// Yosemite Valley
+	Lat, Lng = 37.733614, -119.586598
+	W, H     = 15, 10
+	// Lat0, Lng0 = 37.685097, -119.674018
+	// Lat1, Lng1 = 37.816173, -119.443466
 
 	// Iceland
 	// Lat0, Lng0 = 66.750108, -25.731168
 	// Lat1, Lng1 = 62.881496, -12.699955
+	// Lat0, Lng0 = 66.750108, -25.831168
+	// Lat1, Lng1 = 62.881496, -12.599955
 
 	// Grand Canyon
 	// Lat0, Lng0 = 36.477988, -112.726473
 	// Lat1, Lng1 = 35.940449, -111.561530
-	Lat0, Lng0 = 36.551589, -112.728958
-	Lat1, Lng1 = 35.886162, -111.688370
+	// Lat0, Lng0 = 36.551589, -112.728958
+	// Lat1, Lng1 = 35.886162, -111.688370
 
 	// Mount Everest
 	// Lat0, Lng0 = 28.413539, 86.467738
@@ -34,9 +46,27 @@ const (
 	MaxDownloads   = 16
 )
 
+func boundingBox(lat, lng, widthKm, heightKm float64) (float64, float64, float64, float64) {
+	const eps = 1e-3
+	_, lrKm := haversine.Distance(
+		haversine.Coord{Lat: lat, Lon: lng - eps},
+		haversine.Coord{Lat: lat, Lon: lng + eps})
+	kmPerLng := lrKm / (2 * eps)
+	_, tbKm := haversine.Distance(
+		haversine.Coord{Lat: lat - eps, Lon: lng},
+		haversine.Coord{Lat: lat + eps, Lon: lng})
+	kmPerLat := tbKm / (2 * eps)
+	dLng := widthKm / 2 / kmPerLng
+	dLat := heightKm / 2 / kmPerLat
+	lat0, lat1 := lat-dLat, lat+dLat
+	lng0, lng1 := lng-dLng, lng+dLng
+	return lat0, lng0, lat1, lng1
+}
+
 func main() {
-	min := terrarium.LatLng(Lat0, Lng0)
-	max := terrarium.LatLng(Lat1, Lng1)
+	lat0, lng0, lat1, lng1 := boundingBox(Lat, Lng, W, H)
+	min := terrarium.LatLng(lat0, lng0)
+	max := terrarium.LatLng(lat1, lng1)
 	bounds := maps.Bounds{maps.Point(min), maps.Point(max)}
 	line := maps.NewPolyline([]maps.Point{
 		maps.Point{min.X, min.Y},
@@ -47,6 +77,13 @@ func main() {
 	})
 	shape := maps.Shape{bounds, []*maps.Polyline{line}, nil}
 	shapes := []maps.Shape{shape}
+
+	// var result []maps.Shape
+	// shapes, err := maps.LoadShapefile("ne_10m_admin_0_countries/wgs84.shp",
+	// 	maps.NewShapeTagFilter("NAME", "Iceland"))
+	// if err != nil {
+	// 	panic(err)
+	// }
 
 	p0 := terrarium.TileXY(Z, min)
 	p1 := terrarium.TileXY(Z, max)
@@ -88,7 +125,8 @@ func main() {
 	}
 	// fmt.Println(lo, hi)
 
-	// lo = -1
+	// lo = 0
+	// hi = 2000
 
 	fmt.Println("stitching tiles...")
 	const TileSize = terrarium.TileSize
@@ -136,11 +174,11 @@ func main() {
 	trimmed := im.SubImage(image.Rect(px0+1, py0+1, px1-1, py1-1))
 
 	_, lrKm := haversine.Distance(
-		haversine.Coord{Lat: Lat0, Lon: Lng0},
-		haversine.Coord{Lat: Lat0, Lon: Lng1})
+		haversine.Coord{Lat: lat0, Lon: lng0},
+		haversine.Coord{Lat: lat0, Lon: lng1})
 	_, tbKm := haversine.Distance(
-		haversine.Coord{Lat: Lat0, Lon: Lng0},
-		haversine.Coord{Lat: Lat1, Lon: Lng0})
+		haversine.Coord{Lat: lat0, Lon: lng0},
+		haversine.Coord{Lat: lat1, Lon: lng0})
 	xMeters := lrKm * 1000
 	yMeters := tbKm * 1000
 	zMeters := hi - lo
