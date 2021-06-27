@@ -1,15 +1,15 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"image"
+	"image/color"
 	"image/draw"
-	"math"
 	"os"
 
 	"github.com/fogleman/gg"
 	"github.com/fogleman/terrarium"
+	"github.com/llgcode/draw2d/draw2dsvg"
 )
 
 const (
@@ -41,10 +41,11 @@ func main() {
 	}
 
 	fmt.Println("rendering image...")
-	im := renderPaths(paths, Size, Padding, LineWidth)
+	dest := draw2dsvg.NewSvg()
+	renderPaths(dest, paths, LineWidth)
 
-	fmt.Println("writing png...")
-	gg.SavePNG("out.png", im)
+	fmt.Println("writing svg...")
+	draw2dsvg.SaveToSvgFile("out.svg", dest)
 }
 
 func ensureGray16(im image.Image) (*image.Gray16, bool) {
@@ -93,46 +94,59 @@ func grayToArray(gray *image.Gray) []float64 {
 	return a
 }
 
-func renderPaths(paths []terrarium.Path, size, pad int, lw float64) image.Image {
-	x0 := paths[0][0].X
-	x1 := paths[0][0].X
-	y0 := paths[0][0].Y
-	y1 := paths[0][0].Y
+func renderPaths(dest *draw2dsvg.Svg, paths []terrarium.Path, lw float64) {
+	gc := draw2dsvg.NewGraphicContext(dest)
+	gc.SetStrokeColor(color.Black)
+	gc.SetLineWidth(LineWidth)
+
 	for _, path := range paths {
-		for _, p := range path {
-			if p.X < x0 {
-				x0 = p.X
-			}
-			if p.X > x1 {
-				x1 = p.X
-			}
-			if p.Y < y0 {
-				y0 = p.Y
-			}
-			if p.Y > y1 {
-				y1 = p.Y
-			}
+		gc.MoveTo(path[0].X, path[0].Y)
+		for i := 1; i < (len(path) - 1); i += 1 {
+			gc.LineTo(path[i].X, path[i].Y)
 		}
 	}
-	pw := x1 - x0
-	ph := y1 - y0
-	sx := float64(size-pad*2) / pw
-	sy := float64(size-pad*2) / ph
-	scale := math.Min(sx, sy)
-	dc := gg.NewContext(int(pw*scale)+pad*2, int(ph*scale)+pad*2)
-	dc.SetRGB(1, 1, 1)
-	dc.Clear()
-	dc.Translate(float64(pad), float64(pad))
-	dc.Scale(scale, scale)
-	dc.Translate(-x0, -y0)
-	for _, path := range paths {
-		dc.NewSubPath()
-		for _, p := range path {
-			dc.LineTo(p.X, p.Y)
-		}
-	}
-	dc.SetRGB(0, 0, 0)
-	dc.SetLineWidth(lw)
-	dc.Stroke()
-	return dc.Image()
+	gc.Close()
+	gc.Stroke()
+
+	// x0 := paths[0][0].X
+	// x1 := paths[0][0].X
+	// y0 := paths[0][0].Y
+	// y1 := paths[0][0].Y
+	// for _, path := range paths {
+	// 	for _, p := range path {
+	// 		if p.X < x0 {
+	// 			x0 = p.X
+	// 		}
+	// 		if p.X > x1 {
+	// 			x1 = p.X
+	// 		}
+	// 		if p.Y < y0 {
+	// 			y0 = p.Y
+	// 		}
+	// 		if p.Y > y1 {
+	// 			y1 = p.Y
+	// 		}
+	// 	}
+	// }
+	// pw := x1 - x0
+	// ph := y1 - y0
+	// sx := float64(size-pad*2) / pw
+	// sy := float64(size-pad*2) / ph
+	// scale := math.Min(sx, sy)
+	// dc := gg.NewContext(int(pw*scale)+pad*2, int(ph*scale)+pad*2)
+	// dc.SetRGB(1, 1, 1)
+	// dc.Clear()
+	// dc.Translate(float64(pad), float64(pad))
+	// dc.Scale(scale, scale)
+	// dc.Translate(-x0, -y0)
+	// for _, path := range paths {
+	// 	dc.NewSubPath()
+	// 	for _, p := range path {
+	// 		dc.LineTo(p.X, p.Y)
+	// 	}
+	// }
+	// dc.SetRGB(0, 0, 0)
+	// dc.SetLineWidth(lw)
+	// dc.Stroke()
+	// return dc.Image()
 }
