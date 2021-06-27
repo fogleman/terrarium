@@ -6,6 +6,8 @@ Some code for generating topographic contour maps. Documentation is currently la
 
 `cmd/contours/main.go` will generate contours for a grayscale input image. Again there are some constants at the top of the file that you can configure.
 
+`cmd/grey2svg/main.go` will generate contours for a grayscale input image and output an SVG file.
+
 ## Examples
 
 #### Colorado
