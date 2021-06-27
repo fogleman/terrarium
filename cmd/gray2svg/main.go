@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	Steps     = 100
 	Size      = 1600
 	Padding   = 0
 	LineWidth = 1
@@ -30,7 +31,7 @@ func main() {
 	a := gray16Grid(gray)
 
 	var paths []terrarium.Path
-	for i := 0; i < 65535; i += 1024 {
+	for i := 0; i < 65535; i += Steps {
 		z := float64(i)
 		p := terrarium.Slice(a, w, h, z+1e-7)
 		fmt.Println(z, len(p))
