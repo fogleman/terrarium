@@ -29,20 +29,9 @@ func main() {
 	h := gray.Bounds().Size().Y
 	a := gray16Grid(gray)
 
-	// hist := make(map[float64]int)
-	// for _, v := range a {
-	// 	hist[v] += 1
-	// }
-	// for k := 0; k < 256; k++ {
-	// 	fmt.Println(k, hist[float64(k)])
-	// }
-
 	var paths []terrarium.Path
 	for i := 0; i < 65535; i += 1024 {
 		z := float64(i)
-		// if hist[z] == 0 {
-		// 	continue
-		// }
 		p := terrarium.Slice(a, w, h, z+1e-7)
 		fmt.Println(z, len(p))
 		paths = append(paths, p...)
@@ -53,9 +42,6 @@ func main() {
 
 	fmt.Println("writing png...")
 	gg.SavePNG("out.png", im)
-
-	// fmt.Println("writing axi...")
-	// saveAxi("out.axi", paths)
 }
 
 func ensureGray16(im image.Image) (*image.Gray16, bool) {
@@ -104,25 +90,6 @@ func grayToArray(gray *image.Gray) []float64 {
 	return a
 }
 
-func saveAxi(filename string, paths []terrarium.Path) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	w := bufio.NewWriter(file)
-	for _, path := range paths {
-		for i, p := range path {
-			if i != 0 {
-				fmt.Fprintf(w, " ")
-			}
-			fmt.Fprintf(w, "%g,%g", p.X, p.Y)
-		}
-		fmt.Fprintln(w)
-	}
-	return w.Flush()
-}
-
 func renderPaths(paths []terrarium.Path, size, pad int, lw float64) image.Image {
 	x0 := paths[0][0].X
 	x1 := paths[0][0].X
@@ -164,9 +131,5 @@ func renderPaths(paths []terrarium.Path, size, pad int, lw float64) image.Image 
 	dc.SetRGB(0, 0, 0)
 	dc.SetLineWidth(lw)
 	dc.Stroke()
-	// dc.Identity()
-	// dc.DrawCircle(float64(dc.Width()/2), float64(dc.Height()/2), 8)
-	// dc.SetRGBA(1, 0, 0, 0.9)
-	// dc.Fill()
 	return dc.Image()
 }
