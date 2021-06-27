@@ -34,8 +34,10 @@ func main() {
 	for i := 0; i < 65535; i += Steps {
 		z := float64(i)
 		p := terrarium.Slice(a, w, h, z+1e-7)
-		fmt.Println(z, len(p))
-		paths = append(paths, p...)
+		if len(p) > 0 {
+			fmt.Println("z:", z, len(p))
+			paths = append(paths, p...)
+		}
 	}
 
 	fmt.Println("rendering image...")
