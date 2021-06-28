@@ -7,21 +7,34 @@ import (
 	"math"
 	"os"
 
+	"github.com/disintegration/imaging"
 	"github.com/fogleman/gg"
 	"github.com/fogleman/terrarium"
 )
 
 const (
-	Steps     = 100
-	Size      = 1600
-	Padding   = 0
-	LineWidth = 1
+	Steps                  = 200   // Z slice step size
+	ImageDownscalingFactor = 1     // 1x = original quality, 0.5x = half-resolution (experimental. removes detail from original image to smoothen output)
+	Size                   = 10000 // size in px
+	Padding                = 0
+	LineWidth              = 1
 )
 
 func main() {
+	// validate const
+	if ImageDownscalingFactor > 1 {
+		panic("ImageDownscalingFactor must be <= 1")
+	}
+	// load image
 	src, err := gg.LoadImage(os.Args[1])
 	if err != nil {
 		panic(err)
+	}
+	// apply downscaling
+	if ImageDownscalingFactor < 1 {
+		newWidth := int(float32(src.Bounds().Dx()) * ImageDownscalingFactor)
+		newHeight := int(float32(src.Bounds().Dy()) * ImageDownscalingFactor)
+		src = imaging.Resize(src, newWidth, newHeight, imaging.NearestNeighbor)
 	}
 
 	gray, _ := ensureGray16(src)
