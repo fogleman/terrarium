@@ -3,17 +3,20 @@ package main
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"image/draw"
 	"math"
 	"os"
+	"strconv"
 
 	"github.com/disintegration/imaging"
 	"github.com/fogleman/gg"
 	"github.com/fogleman/terrarium"
+	"github.com/llgcode/draw2d/draw2dsvg"
 )
 
 const (
-	Steps                  = 200   // Z slice step size
+	Steps                  = 100   // Z slice step size
 	ImageDownscalingFactor = 1     // 1x = original quality, 0.5x = half-resolution (experimental. removes detail from original image to smoothen output)
 	Size                   = 10000 // size in px
 	Padding                = 0
@@ -53,10 +56,10 @@ func main() {
 	}
 
 	fmt.Println("rendering image...")
-	im := renderPaths(paths, Size, Padding, LineWidth)
+	dest := renderPaths(paths, Size, Padding, LineWidth)
 
-	fmt.Println("writing png...")
-	gg.SavePNG("out.png", im)
+	fmt.Println("writing svg...")
+	draw2dsvg.SaveToSvgFile("out.svg", dest)
 }
 
 func ensureGray16(im image.Image) (*image.Gray16, bool) {
@@ -105,7 +108,7 @@ func grayToArray(gray *image.Gray) []float64 {
 	return a
 }
 
-func renderPaths(paths []terrarium.Path, size, pad int, lw float64) image.Image {
+func renderPaths(paths []terrarium.Path, size, pad int, lw float64) *draw2dsvg.Svg {
 	x0 := paths[0][0].X
 	x1 := paths[0][0].X
 	y0 := paths[0][0].Y
@@ -131,20 +134,25 @@ func renderPaths(paths []terrarium.Path, size, pad int, lw float64) image.Image 
 	sx := float64(size-pad*2) / pw
 	sy := float64(size-pad*2) / ph
 	scale := math.Min(sx, sy)
-	dc := gg.NewContext(int(pw*scale)+pad*2, int(ph*scale)+pad*2)
-	dc.SetRGB(1, 1, 1)
-	dc.Clear()
-	dc.Translate(float64(pad), float64(pad))
-	dc.Scale(scale, scale)
-	dc.Translate(-x0, -y0)
+	fmt.Println(scale)
+
+	svg := draw2dsvg.NewSvg()
+	svg.Width = strconv.Itoa(int(pw*scale) + pad*2)
+	svg.Height = strconv.Itoa(int(ph*scale) + pad*2)
+	gc := draw2dsvg.NewGraphicContext(svg)
+	gc.SetStrokeColor(color.Black)
+	gc.SetLineWidth(LineWidth)
+	gc.Translate(float64(pad), float64(pad))
+	gc.Scale(scale, scale)
+	gc.Translate(-x0, -y0)
 	for _, path := range paths {
-		dc.NewSubPath()
-		for _, p := range path {
-			dc.LineTo(p.X, p.Y)
+		gc.MoveTo(path[0].X, path[0].Y)
+		for i := 1; i < (len(path) - 1); i += 1 {
+			gc.LineTo(path[i].X, path[i].Y)
 		}
 	}
-	dc.SetRGB(0, 0, 0)
-	dc.SetLineWidth(lw)
-	dc.Stroke()
-	return dc.Image()
+	gc.Close()
+	gc.Stroke()
+
+	return svg
 }
